@@ -1,5 +1,6 @@
 
 
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,7 +15,7 @@ mask=1	掩盖区域	_mr	mask-required 需要进行掩盖的区域，可信度较
 
 # 这部分是用来计算整个似然结果的
 class Agito(nn.Module):
-    def __init__(self, alpha_mi=1.0, beta_mi=1.0, alpha_mr=1.0, beta_mr=1.0):
+    def __init__(self, pglobal_mi, pglobal_mr, alpha_mi=1.0, beta_mi=1.0, alpha_mr=1.0, beta_mr=1.0):
         super(Agito, self).__init__()
         # 约束参数范围（避免梯度NaN）
         self.alpha_mi = nn.Parameter(torch.tensor(alpha_mi).clamp(min=0.1))
@@ -25,6 +26,18 @@ class Agito(nn.Module):
         # 预设概率权重（需sigmoid约束到(0,1)）
         self.P_mi = nn.Parameter(torch.tensor(0.5))
         self.P_mr = nn.Parameter(torch.tensor(0.5))
+
+        # 更新频率，假设一开始更新频率都是0
+        self.update_mi = 0
+        self.update_mr = 0
+
+        # 计算记忆参数,一开始的记忆参数均为1
+        self.lambda_mi=nn.Parameter(torch.tensor(1.))
+        self.lambda_mr=nn.Parameter(torch.tensor(1.))
+
+        # 计算全局的无掩盖概率和掩盖概率
+        self.pglobal_mi = pglobal_mi  # 全
+        self.pglobal_mr = pglobal_mr  # 全局掩盖概率
 
     def test(self):
         print("Agito model is ready for testing.")
@@ -64,7 +77,7 @@ class Agito(nn.Module):
     def euclidean_distance(self,tensor1, tensor2):
         return torch.norm(tensor1 - tensor2, p=2)
     # 计算不确定性(熵)，结果越可靠熵越小，e^-entropy越大,越接近1
-    def binary_entropy(self,probs, epsilon=1e-12, reduction='mean'):
+    def binary_entropy(self, probs, epsilon=1e-12, reduction='mean'):
         probs = torch.clamp(probs, epsilon, 1 - epsilon)  # 保证数值稳定
         entropy = -probs * torch.log(probs) - (1 - probs) * torch.log(1 - probs)
 
@@ -81,17 +94,44 @@ class Agito(nn.Module):
 
     # 根据当前批次的正确和错误数值，计算并且迭代参数
     # S这里设定为“需要掩盖”的样本数目， F为“无需掩盖的样本”
-    def update_ab(self, num_mask_ignore, num_mask_required):
-        lambda_mi=0.9
-        lambda_mr=0.9
-        omega_mi=0.1
-        omega_mr=0.1
+    '''
+    参数格式：
+    num_mask_ignore: int, 无需掩盖的样本数目
+    num_mask_required: int, 需要掩盖的样本数目
+    model_output: torch.Tensor, 模型输出的预测结果
+    labels: torch.Tensor, 真实标签 --------------------------》这两个标签都需要[batch_size, feature_size]的格式
+    pglobal_mi: float, 全局的无掩盖概率
+    pglobal_mr: float, 全局的掩盖概率-------------------------》这两个是全局计算的指标
+    '''
+    def update_ab(self, num_mask_ignore, num_mask_required, model_output, labels,lam=0.1,sen_w=0.7):\
+        
+        '''
+        计算散度：使用pglobal和num_mask_ignore, num_mask_required计算KL散度
+        计算欧氏距离：使用model_output和labels计算欧氏距离
+        计算二元熵：使用model_output计算二元熵
+        更新参数：使用上述计算结果更新alpha_mi, beta_mi, alpha_mr, beta_mr
+        '''
+        # 先更新速率
+        self.update_mi = self.update_mi  +  num_mask_ignore
+        self.update_mr = self.update_mr  + num_mask_required
+        # 先对记忆参数进行更新
+        self.lambda_mi.data = self.lambda_mi.data * math.exp(min(abs(num_mask_required/(num_mask_ignore+1)),1))
+        self.lambda_mr.data = self.lambda_mr.data * math.exp(min(abs(num_mask_ignore/(num_mask_required+1)),1))
+        # 然后在计算全局和普通的p值
+        P_mi= num_mask_ignore / (num_mask_ignore + num_mask_required)
+        P_mr= num_mask_required / (num_mask_ignore + num_mask_required)
+        # 再分别计算omega
+        pbatch =  torch.tensor([P_mi, P_mr])
+        pglobal =  torch.tensor([self.pglobal_mi, self.pglobal_mr])
 
-        self.alpha_mi.data = self.alpha_mi.data * lambda_mi + omega_mi * num_mask_ignore
-        self.beta_mi.data  = self.beta_mi.data  * lambda_mi + omega_mi * num_mask_required
+        omega=((sen_w * self.binary_entropy(model_output))+math.exp(-1*lam*self.kl_divergence(pbatch,pglobal)))/(1+self.euclidean_distance(model_output,labels))
 
-        self.alpha_mr.data = self.alpha_mr.data * lambda_mr + omega_mr * num_mask_required
-        self.beta_mr.data  = self.beta_mr.data  * lambda_mr + omega_mr * num_mask_ignore
+        self.alpha_mi.data = self.alpha_mi.data * self.lambda_mi + omega * num_mask_ignore
+        self.beta_mi.data  = self.beta_mi.data  * self.lambda_mi + omega * num_mask_required
+
+        self.alpha_mr.data = self.alpha_mr.data * self.lambda_mr + omega * num_mask_required
+        self.beta_mr.data  = self.beta_mr.data  * self.lambda_mr + omega * num_mask_ignore
+        print("更新成功")
 
         
     # 前向传播函数，计算似然概率
@@ -111,6 +151,17 @@ class Agito(nn.Module):
         # 3. 最终概率（反向传播友好）
         return (log_numerator - log_denominator).exp()  # [batch_size]
 
+
+
+
+
+
+
+
+
+
+
+
 # 暂时假设输入是一个一维向量，长度为13
 # 善, 还真能跑起来啊, 就是输入要求是0,1之间的浮点数, 这个到时候需要在神经网络上限制一下
 
@@ -118,10 +169,18 @@ input=torch.randn(10, 15)  # 输入特征数值是任意的
 input= torch.sigmoid(input)  # 映射到(0,1)数据的输入特征必须是0.1之间
 
 
-model = Agito()
+model = Agito(pglobal_mi=0.6, pglobal_mr=0.4, alpha_mi=1.0, beta_mi=1.0, alpha_mr=1.0, beta_mr=1.0)
 print(model(input))
 
+
+
+
+
+#=========测试区域===============
+
+'''
 print("Model parameters:",model.test())
+
 
 
 
@@ -142,3 +201,12 @@ print("Euclidean Distance:", euclidean_result)
 probs = torch.tensor([0.8, 0.21])
 entropy_result = model.binary_entropy(probs, reduction='mean')
 print("Binary Entropy:", 0.7*entropy_result)
+
+# 测试更新参数
+num_mask_ignore = 5
+num_mask_required = 3
+pglobal_mi = 0.6
+pglobal_mr = 0.4    
+model.update_ab(num_mask_ignore, num_mask_required, input, input+1, pglobal_mi, pglobal_mr)
+print("Updated parameters:")
+'''
