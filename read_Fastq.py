@@ -43,3 +43,6 @@ arr=read_fastq('test.fastq')
 print("读取的Fastq文件内容:") # 打出来的长度我们姑且可以认为是一样的
 for item in arr[:5]:  # 只打印前5个序列
     print(item)
+
+
+# 能读取, 但是还得是神经网络
