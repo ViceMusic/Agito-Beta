@@ -6,28 +6,30 @@ import torch.optim as optim
 import torch.distributions as dist
 import numpy as np
 
+'''
+在这个文件中存在命名规范
+mask=0	非掩盖区域	_mi	mask-ignore    代表无需进行掩盖的区域，可信度较高
+mask=1	掩盖区域	_mr	mask-required 需要进行掩盖的区域，可信度较低
+'''
+
 # 这部分是用来计算整个似然结果的
 class Agito(nn.Module):
-    def __init__(self, alpha_bg=1.0, beta_bg=1.0, alpha_si=1.0, beta_si=1.0):
+    def __init__(self, alpha_mi=1.0, beta_mi=1.0, alpha_mr=1.0, beta_mr=1.0):
         super(Agito, self).__init__()
-
-        '''
-        关于似然分布计算的基础部分
-        其中, bg和1都代表mask=1的情况, si和0代表mask=0的情况
-        '''
         # 约束参数范围（避免梯度NaN）
-        self.alpha_bg = nn.Parameter(torch.tensor(alpha_bg).clamp(min=0.1))
-        self.beta_bg = nn.Parameter(torch.tensor(beta_bg).clamp(min=0.1))
-        self.alpha_si = nn.Parameter(torch.tensor(alpha_si).clamp(min=0.1))
-        self.beta_si = nn.Parameter(torch.tensor(beta_si).clamp(min=0.1))
+        self.alpha_mi = nn.Parameter(torch.tensor(alpha_mi).clamp(min=0.1))
+        self.beta_mi = nn.Parameter(torch.tensor(beta_mi).clamp(min=0.1))
+        self.alpha_mr = nn.Parameter(torch.tensor(alpha_mr).clamp(min=0.1))
+        self.beta_mr = nn.Parameter(torch.tensor(beta_mr).clamp(min=0.1))
         
         # 预设概率权重（需sigmoid约束到(0,1)）
-        self.P1 = nn.Parameter(torch.tensor(0.5))
-        self.P0 = nn.Parameter(torch.tensor(0.5))
+        self.P_mi = nn.Parameter(torch.tensor(0.5))
+        self.P_mr = nn.Parameter(torch.tensor(0.5))
+
     def test(self):
         print("Agito model is ready for testing.")
-        print("Alpha_bg:", self.alpha_bg.item())
-        print("Beta_bg:", self.beta_bg.item())  
+        print("Alpha_mi:", self.alpha_mi.item())
+        print("Beta_mi:", self.beta_mi.item())  
         return "This is a test message from Agito model."
 
     #==============tools========================
@@ -76,18 +78,34 @@ class Agito(nn.Module):
 
 
     #==========计算核心部分========================
+
+    # 根据当前批次的正确和错误数值，计算并且迭代参数
+    # S这里设定为“需要掩盖”的样本数目， F为“无需掩盖的样本”
+    def update_ab(self, num_mask_ignore, num_mask_required):
+        lambda_mi=0.9
+        lambda_mr=0.9
+        omega_mi=0.1
+        omega_mr=0.1
+
+        self.alpha_mi.data = self.alpha_mi.data * lambda_mi + omega_mi * num_mask_ignore
+        self.beta_mi.data  = self.beta_mi.data  * lambda_mi + omega_mi * num_mask_required
+
+        self.alpha_mr.data = self.alpha_mr.data * lambda_mr + omega_mr * num_mask_required
+        self.beta_mr.data  = self.beta_mr.data  * lambda_mr + omega_mr * num_mask_ignore
+
+        
     # 前向传播函数，计算似然概率
     def forward(self, x):
          # 1. 计算对数概率（数值稳定版）
-        log_beta_bg = dist.Beta(self.alpha_bg, self.beta_bg).log_prob(x).sum(dim=1)  # [batch_size]
-        log_beta_si = dist.Beta(self.alpha_si, self.beta_si).log_prob(x).sum(dim=1)
+        log_beta_mi = dist.Beta(self.alpha_mi, self.beta_mi).log_prob(x).sum(dim=1)  # [batch_size]
+        log_beta_mr = dist.Beta(self.alpha_mr, self.beta_mr).log_prob(x).sum(dim=1)
         
         # 2. 加权求和（使用logsumexp防溢出）
-        log_numerator = log_beta_bg + torch.sigmoid(self.P1).log()
+        log_numerator = log_beta_mr + torch.sigmoid(self.P_mr).log()
         log_denominator = torch.logsumexp(
             torch.stack([
-                log_beta_bg + torch.sigmoid(self.P1).log(),
-                log_beta_si + torch.sigmoid(self.P0).log()
+                log_beta_mr + torch.sigmoid(self.P_mr).log(),
+                log_beta_mi + torch.sigmoid(self.P_mi).log()
             ]), dim=0)
         
         # 3. 最终概率（反向传播友好）
