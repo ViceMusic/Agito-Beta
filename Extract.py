@@ -82,21 +82,28 @@ class Encoder(nn.Module):
         gamma = torch.zeros(batch_size, seq_len, 1, device=u.device)
         y = torch.zeros(batch_size, seq_len, self.state_dim, device=u.device)
         
+        x_forward_new = x_forward.clone()
+        x_backward_new = x_backward.clone()
+        
         # 1. 正向状态计算 (从左到右)
         # x_t = A*x_{t-1} + B*u_t, x_0 = u_0
         for t in range(seq_len):
             if t == 0:
-                x_forward[:, t] = u[:, 0]  # x_0 = u_0
+                x_forward_new[:, t] = u[:, 0]  # x_0 = u_0
             else:
-                x_forward[:, t] = self.A(x_forward[:, t-1]) + self.B(u[:, t])
+                x_forward_new[:, t] = self.A(x_forward[:, t-1]) + self.B(u[:, t])
         
         # 2. 反向状态计算 (从右到左)
         # x_t^ = A*x_{t+1}^ + B*u_{t+1}, x_{L-1}^ = u_{L-1}
+
         for t in range(seq_len-1, -1, -1):
             if t == seq_len - 1:
-                x_backward[:, t] = u[:, -1]  # x_{L-1}^ = u_{L-1}
+                x_backward_new[:, t] = u[:, -1]  # x_{L-1}^ = u_{L-1}
             else:
-                x_backward[:, t] = self.Af(x_backward[:, t+1]) + self.Bf(u[:, t+1])
+                x_backward_new[:, t] = self.Af(x_backward[:, t+1]) + self.Bf(u[:, t+1])
+        
+        x_forward = x_forward_new
+        x_backward = x_backward_new
         
         # 3. 计算开度系数gamma_t
         gamma = torch.sigmoid(
