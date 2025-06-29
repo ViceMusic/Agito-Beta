@@ -16,6 +16,6 @@ class Agito_Ground(nn.Module):
 
     def forward(self, x):
         u = self.embedding(x)  # (batch_size, seq_len, 4)
-        y, gamma, final = self.encoder(u)  # (batch_size, seq_len)
+        y, gamma, final = self.encoder(u)  # y为(batch_size,seq_len,state_size)final为(batch_size, seq_len)
         # 简单平均后作为二分类预测
         return final.mean(dim=1)
