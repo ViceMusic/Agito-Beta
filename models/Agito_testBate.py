@@ -1,4 +1,9 @@
-
+# Agito_testBate.py
+'''
+本文件主要是使用贝塔分布进行计算的，关于分布的排列方式我们放在下方
+至于为什么不再用这个东西我只能说这个东西简直是糖丸了，成功学到了数据集的统计学规律
+。。。。。。。。。。
+'''
 
 import math
 import torch
@@ -327,7 +332,6 @@ class Agito(nn.Module):
     # 计算不确定性(熵)，结果越可靠熵越小，e^-entropy越大,越接近1
     def binary_entropy(self, probs, epsilon=1e-3, reduction='mean'):
         probs = torch.clamp(probs, epsilon, 1 - epsilon)  # 保证数值稳定
-        print("计算置信度的时候检查",probs)
         entropy = -probs * torch.log(probs) - (1 - probs) * torch.log(1 - probs)
 
         if reduction == 'mean':
@@ -384,13 +388,15 @@ class Agito(nn.Module):
 
         omega=((sen_w * self.binary_entropy(model_output))+math.exp(-1*lam*self.kl_divergence(pbatch,pglobal)))/(1+self.euclidean_distance(model_output,labels))
 
-        print("置信度权重",(sen_w * self.binary_entropy(model_output)))
+        '''
+                print("置信度权重",(sen_w * self.binary_entropy(model_output)))
         print("置信度权重的问题？")
         print("分布权重",math.exp(-1*lam*self.kl_divergence(pbatch,pglobal)))
         print("距离权重",(1+self.euclidean_distance(model_output,labels)))
         print("omega",omega)
         print("更新标签数值：",num_mask_ignore, num_mask_required)
         print("记忆参数：",self.lambda_mi, self.lambda_mr)
+        '''
 
         self.alpha_mi.data = self.alpha_mi.data * self.lambda_mi + omega * num_mask_ignore
         self.beta_mi.data  = self.beta_mi.data  * self.lambda_mi + omega * num_mask_required
@@ -409,7 +415,6 @@ class Agito(nn.Module):
     def forward(self, x):
         vocal_features= self.embedding(x)  # [batch_size, seq_len, vocab_dim]
         encoded_features, _, x = self.encoder(vocal_features)  # [batch_size, seq_len] 其中x为final_output
-        print("输出x",x)
          # 1. 计算对数概率（数值稳定版）
         log_beta_mi = self.beta_log_prob(x, self.alpha_mi, self.beta_mi).sum(dim=1)
         log_beta_mr = self.beta_log_prob(x, self.alpha_mr, self.beta_mr).sum(dim=1)
@@ -424,17 +429,12 @@ class Agito(nn.Module):
             ]), dim=0)
         
         # 3. 最终概率（反向传播友好）
-        return (log_numerator - log_denominator).exp()  # [batch_size]
+        return (log_numerator - log_denominator).exp(), x.mean(dim=1)  # [batch_size]
 
 # 暂时假设输入是一个一维向量，长度为13
 # 善, 还真能跑起来啊, 就是输入要求是0,1之间的浮点数, 这个到时候需要在神经网络上限制一下
 
-# 整个模型是可以这样子跑起来的，
-input=['ACGT', 'TTGCA', 'GCGTAC', 'NNNNN']  # 假设输入是一个包含DNA序列的列表
 
-
-model = Agito(pglobal_mi=0.6, pglobal_mr=0.4, alpha_mi=1.0, beta_mi=1.0, alpha_mr=1.0, beta_mr=1.0)
-print(model(input))
 
 
 
@@ -444,7 +444,12 @@ print(model(input))
 
 '''
 print("Model parameters:",model.test())
+# 整个模型是可以这样子跑起来的，
+input=['ACGT', 'TTGCA', 'GCGTAC', 'NNNNN']  # 假设输入是一个包含DNA序列的列表
 
+
+model = Agito(pglobal_mi=0.6, pglobal_mr=0.4, alpha_mi=1.0, beta_mi=1.0, alpha_mr=1.0, beta_mr=1.0)
+print(model(input))
 
 
 
