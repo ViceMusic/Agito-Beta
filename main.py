@@ -25,7 +25,7 @@ optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 arr=[]
 
-for epoch in range(10):  # 假设训练10个epoch
+for epoch in range(100):  # 假设训练10个epoch
     for seq_batch, label_batch in dataloader:
         result= model(list(seq_batch))  # 假设模型可以直接处理字符串序列
         loss = criterion(result, label_batch.float())     # batch_y shape: [batch]
@@ -37,4 +37,4 @@ for epoch in range(10):  # 假设训练10个epoch
     arr.append(loss.item())  # 保存每个epoch的损失值
     
 print("训练完成！",model(["AGCTAGC"]))
-#plot_list_as_line_chart(arr, title="Training Loss Curve", xlabel="Epoch", ylabel="Loss")  # 绘制损失曲线图
+plot_list_as_line_chart(arr, title="Training Loss Curve2", xlabel="Epoch", ylabel="Loss")  # 绘制损失曲线图
