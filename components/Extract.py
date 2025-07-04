@@ -37,6 +37,11 @@ peak数值需要进行具体分析， 暂定规划为在某段基因上的富集
 [batch_size, seq_len] 强行进行了一个分类器和reshape操作，也因此数据被固定在1的维度上， 不建议动
 '''
 
+# 除了最后一次更新以外还需要注明的点：
+"""
+input和state，一个是输入大小一个是输出大小，必须是一样的
+因为涉及到初始状态的计算
+"""
 
 
 # 基于双问状态方程和门控机制的空间信息编码器
@@ -44,7 +49,7 @@ import torch
 import torch.nn as nn
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, state_dim,final_dim=1):
+    def __init__(self, input_dim, state_dim ,final_dim=1):
         """
         基于双问状态方程和门控机制的空间信息编码器
         
@@ -57,11 +62,11 @@ class Encoder(nn.Module):
         self.state_dim = state_dim
         
         # 状态转移参数 (公式中的A, B)
-        self.A = nn.Linear(state_dim, state_dim, bias=False)
+        self.A = nn.Linear(input_dim, state_dim, bias=False)
         self.B = nn.Linear(input_dim, state_dim, bias=False)
 
         # 反向状态转移参数 (公式中的A, B)
-        self.Af = nn.Linear(state_dim, state_dim, bias=False)
+        self.Af = nn.Linear(input_dim, state_dim, bias=False)
         self.Bf = nn.Linear(input_dim, state_dim, bias=False)
         
         # 门控参数 (公式中的w1, w2, b)

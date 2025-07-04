@@ -10,14 +10,15 @@ from components.Extract import Encoder  # 假设Encoder在同一目录下
 from components.setAtten import SetAttention  # 假设SetAttention在同一目录下
 
 class Agito_Ground(nn.Module):
-    def __init__(self):
+    def __init__(self, mapping_dim=4):
         super().__init__()
-        self.embedding = DNAEmbedding(vocab_dim=4, window_size=1)
-        self.encoder = Encoder(input_dim=4, state_dim=4)
-        self.set_attention = SetAttention(state_size=4, num_heads=4, lambda_min=0.7, gamma_max=0.3)
+        m=mapping_dim
+        self.embedding = DNAEmbedding(vocab_dim=m, window_size=1)
+        self.encoder = Encoder(input_dim=m, state_dim=m)
+        self.set_attention = SetAttention(state_size=m, num_heads=m, lambda_min=0.7, gamma_max=0.3)
 
         # 临时区域
-        self.final_fc = nn.Linear(4, 1)  # 映射成一个数字
+        self.final_fc = nn.Linear(m, 1)  # 映射成一个数字
 
     def forward(self, x):
         u = self.embedding(x)  # (batch_size, seq_len, 4)

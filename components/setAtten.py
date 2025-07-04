@@ -7,6 +7,11 @@ import torch.nn.functional as F
 """SetAttention 模块
 该模块实现了一个多头注意力机制，结合全局池化向量和, 主要目的是确保平移不变性, 保证每个元素不再存在相互关系
 """
+
+# 补充说明
+'''
+state_size必须和num_heads一致或者大于heads
+'''
 class SetAttention(nn.Module):
     def __init__(self, state_size, num_heads=4, lambda_min=0.7, gamma_max=0.3):
         super().__init__()

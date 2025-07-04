@@ -16,16 +16,16 @@ from tools.Dataload import get_batch_data # 引入获取数据的方法
 from tools.graph import plot_list_as_line_chart  # 假设graph.py在tools目录下
 
 
-
+# 加载AgitΩ大地形态
 model = Agito_Ground()
 
-dataloader = get_batch_data("asset/test.csv", batch_size=10, shuffle=True)  # 假设数据在data目录下
+dataloader = get_batch_data("asset/test1.csv", batch_size=10, shuffle=True)  # 假设数据在data目录下
 criterion = nn.BCELoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 arr=[]
 
-for epoch in range(100):  # 假设训练10个epoch
+for epoch in range(1000):  # 假设训练10个epoch
     for seq_batch, label_batch in dataloader:
         result= model(list(seq_batch))  # 假设模型可以直接处理字符串序列
         loss = criterion(result, label_batch.float())     # batch_y shape: [batch]
@@ -37,4 +37,4 @@ for epoch in range(100):  # 假设训练10个epoch
     arr.append(loss.item())  # 保存每个epoch的损失值
     
 print("训练完成！",model(["AGCTAGC"]))
-plot_list_as_line_chart(arr, title="Training Loss Curve2", xlabel="Epoch", ylabel="Loss")  # 绘制损失曲线图
+plot_list_as_line_chart(arr, title="Training Loss Curve4", xlabel="Epoch", ylabel="Loss")  # 绘制损失曲线图
