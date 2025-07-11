@@ -69,12 +69,8 @@ Common in memory-based models
 
 #### 📈 明日计划 / TODO
 
-- learn the graph network and study how to use "independent slot token"
-
-```
-Slot tokens	
-Common in memory-based models	
-"Each slot token stores distinct information"
-```
-
-s
+- nope
+- study english
+- study "Slot-to-Slot" graph structure auto modeling
+- study contrastive study
+- By the way, I find a interesting loss function called "香农熵计算信息密度"
