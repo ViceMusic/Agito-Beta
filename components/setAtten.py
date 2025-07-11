@@ -55,10 +55,12 @@ class SetAttention(nn.Module):
             lambda_val * x_pooled[:, :-1, :] + 
             gamma_val * pooled.expand(-1, seq_len, -1)
         )
+
+        return x_fused
         
         # 5. 多头注意力处理 [batch_size, seq_len+1, state_size]
-        attn_output, _ = self.mha(x_fused, x_fused, x_fused)
-        return attn_output
+        # attn_output, _ = self.mha(x_fused, x_fused, x_fused)
+        # return attn_output
 
 
 '''

@@ -25,6 +25,12 @@ class Agito_Ground(nn.Module):
         encoder_output, gamma, final = self.encoder(u)  # y为(batch_size,seq_len,state_size)final为(batch_size, seq_len)
         out = self.set_attention(encoder_output)  # (batch_size, seq_len+1, state_size)
 
+        # 经过平移不变性的结果，我们将其称之为slot-token
+        '''
+        ssm带来了多视角建模的能力
+        多头注意力则为每个token补充了全局视角，同时增加了平移不变性
+        '''
+
         #临时区域----这部分是临时给注意力机制用的
         # 方法一：使用平均池化
         pooled = out.mean(dim=1)  # [batch_size, state_size]

@@ -19,13 +19,13 @@ from tools.graph import plot_list_as_line_chart  # 假设graph.py在tools目录�
 # 加载AgitΩ大地形态
 model = Agito_Ground()
 
-dataloader = get_batch_data("asset/test1.csv", batch_size=10, shuffle=True)  # 假设数据在data目录下
+dataloader = get_batch_data("asset/test2.csv", batch_size=10, shuffle=True)  # 假设数据在data目录下
 criterion = nn.BCELoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 arr=[]
 
-for epoch in range(1000):  # 假设训练10个epoch
+for epoch in range(100):  # 假设训练10个epoch
     for seq_batch, label_batch in dataloader:
         result= model(list(seq_batch))  # 假设模型可以直接处理字符串序列
         loss = criterion(result, label_batch.float())     # batch_y shape: [batch]
