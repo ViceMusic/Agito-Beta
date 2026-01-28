@@ -32,7 +32,7 @@ Adaptive Genomic-Informed Task-Optimizer (AGITO)​
 
 这个仓库的代码，也终于等到了**重启**的时刻。
 
-
+![alt text](image.png)
 
 
 ## 📅 开发日志
